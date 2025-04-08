@@ -25,3 +25,4 @@ chmod 600 ~/.ssh/authorized_keys
 sudo service ssh restart
 
 echo "✅ SSH 服务配置完成！请确认 Windows 层已设置端口转发。"
+echo "LogLevel DEBUG3" | sudo tee -a /etc/ssh/sshd_config
