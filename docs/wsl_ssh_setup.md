@@ -1,199 +1,92 @@
-# ✅ A 电脑通过 SSH 密钥登录 B 电脑的 WSL 子系统 —— 配置全流程
+# 🧰 Remote Access Playbook
 
-## 🖥️ 环境说明
-
-- A 电脑（客户端）：Windows，用户为 `Leon`
-- B 电脑（服务器）：Windows + WSL，WSL 用户为 `steven`
-- 目标：从 A 电脑使用 SSH 密钥连接 B 的 WSL 子系统（端口 2222），并在 VSCode 中远程编辑文件
+A practical playbook for setting up secure remote access from one PC (A) to another (B), covering both **WSL** and **Windows** environments.
 
 ---
 
-## 🪪 第 1 步：A 电脑生成 SSH 密钥
-
-在 A 电脑 CMD 中运行：
-
-```cmd
-ssh-keygen -t ed25519 -f %USERPROFILE%\.ssh\b_wsl_ed25519
-```
-
-按提示操作，生成两个文件：
-
-- 私钥：`C:\Users\Leon\.ssh\b_wsl_ed25519`
-- 公钥：`C:\Users\Leon\.ssh\b_wsl_ed25519.pub`
-
----
-
-## 🌐 第 2 步：配置 B 电脑的 WSL
-
-### 2.1 安装并启动 SSH 服务（在 WSL 中执行）
-
-```bash
-sudo apt update
-sudo apt install openssh-server
-sudo service ssh start
-```
-
-### 2.2 修改 sshd_config 文件
-
-```bash
-sudo nano /etc/ssh/sshd_config
-```
-
-确保配置如下：
+## 📂 Structure
 
 ```
-Port 2222
-ListenAddress 0.0.0.0
-PasswordAuthentication no
-PubkeyAuthentication yes
-PermitRootLogin prohibit-password
-AuthorizedKeysFile .ssh/authorized_keys
-```
-
-重启 SSH：
-
-```bash
-sudo service ssh restart
-```
-
-### 2.3 添加 A 端公钥到 `~/.ssh/authorized_keys`
-
-1. 在 A 电脑查看公钥内容：
-
-```cmd
-type %USERPROFILE%\.ssh\b_wsl_ed25519.pub
-```
-
-2. 在 B 的 WSL 中：
-
-```bash
-mkdir -p ~/.ssh
-chmod 700 ~/.ssh
-nano ~/.ssh/authorized_keys
-```
-
-粘贴 A 端公钥（必须是一整行），保存后：
-
-```bash
-chmod 600 ~/.ssh/authorized_keys
+remote-access-playbook/
+├── README.md
+├── scripts/
+│   ├── connect_b_wsl.bat          # Connect to B's WSL from A
+│   ├── init_wsl_ssh.sh            # One-click setup script for B's WSL
+│   └── init_win_ssh.ps1           # One-click setup for B's Windows (Run as Administrator)
+└── docs/
+    └── wsl_ssh_setup.md           # Detailed setup guide for WSL remote access
 ```
 
 ---
 
-## 🔁 第 3 步：配置端口转发（在 B 的 Windows CMD 中）
+## ✅ Features
 
-### 3.1 获取 WSL IP
-
-```bash
-ip -4 addr show eth0 | grep inet
-```
-
-假设 WSL IP 为 `172.28.19.45`
-
-### 3.2 设置端口转发
-
-```cmd
-netsh interface portproxy add v4tov4 listenport=2222 listenaddress=0.0.0.0 connectport=2222 connectaddress=172.28.19.45
-```
-
-### 3.3 开放防火墙端口
-
-```cmd
-netsh advfirewall firewall add rule name="WSL SSH" dir=in action=allow protocol=TCP localport=2222
-```
+- 🔐 SSH key-based login from A → B (WSL & Windows)
+- 🔀 Windows-to-WSL port forwarding setup
+- 💻 VSCode Remote - SSH integration
+- 🧰 One-click setup scripts for both Windows and WSL
+- 📦 Extensible for other protocols (WinRM, RDP, SMB...)
 
 ---
 
-## 🧪 第 4 步：A 电脑测试连接
+## 🚀 Quick Start
+
+### 1. On B's WSL:
+
+Run the setup script:
 
 ```bash
-ssh -i ~/.ssh/b_wsl_ed25519 steven@58.177.71.154 -p 2222
+bash scripts/init_wsl_ssh.sh
 ```
 
----
+(Replace `PUBLIC_KEY=` inside the script with your actual SSH public key.)
 
-## 🧾 第 5 步：A 端配置 `.ssh/config`
+### 2. On B's Windows:
 
-文件：`C:\Users\Leon\.ssh\config`
+Run the PowerShell setup (as administrator):
 
-```ssh
-Host b-wsl
-    HostName 58.177.71.154
-    Port 2222
-    User steven
-    IdentityFile ~/.ssh/b_wsl_ed25519
-    IdentitiesOnly yes
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/init_win_ssh.ps1
 ```
 
-测试连接：
+### 3. On A:
+
+Connect via:
+
+```bash
+ssh -i ~/.ssh/b_wsl_ed25519 steven@<B_IP> -p 2222
+```
+
+Or, after editing your `~/.ssh/config`:
 
 ```bash
 ssh b-wsl
 ```
 
----
-
-## 💻 第 6 步：使用 VSCode 编辑远程 WSL 文件
-
-### 安装插件
-- VSCode 安装插件：**Remote - SSH**
-
-### 打开方式
-打开 PowerShell 或 CMD，执行：
+### 4. (Optional) Use VSCode to edit files remotely:
 
 ```bash
 code --folder-uri "vscode-remote://ssh-remote+b-wsl/home/steven"
 ```
 
-即可远程打开 WSL 中 `/home/steven` 文件夹。
+---
+
+## 📖 Full Guide
+
+See [`docs/wsl_ssh_setup.md`](docs/wsl_ssh_setup.md) for detailed step-by-step instructions.
 
 ---
 
-## 📦 `.bat` 脚本：A 电脑一键连接（`connect_b_wsl.bat`）
+## 🛣️ Roadmap
 
-```bat
-@echo off
-set "SSH_CONFIG=%USERPROFILE%\.ssh\config"
-if not exist "%SSH_CONFIG%" (
-    echo SSH config 文件不存在，请先配置 %SSH_CONFIG%
-    pause
-    exit /b
-)
-
-echo 正在连接 B 电脑 WSL...
-ssh b-wsl
-```
+- ✅ A → B (WSL via SSH)
+- ✅ A → B (Windows native via OpenSSH)
+- 🔜 Remote desktop (RDP)
+- 🔜 File sharing (SMB/Samba)
+- 🔜 Multi-hop tunneling & private network (Zerotier/Tailscale)
 
 ---
 
-## 📜 WSL 初始化脚本：B 端设置 SSH 服务 + 公钥（`init_wsl_ssh.sh`）
+## 📄 License
 
-这个脚本适合你从 WSL 中运行，**你只需要提前把公钥内容粘贴到 `PUBLIC_KEY` 变量中即可**：
-
-```bash
-#!/bin/bash
-
-# 设置你从 A 电脑复制来的公钥（必须是完整一行）
-PUBLIC_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAZ...你的key... leon@DESKTOP-xxx"
-
-# 安装 openssh-server
-sudo apt update && sudo apt install -y openssh-server
-
-# 修改 sshd 配置
-sudo sed -i 's/^#\?Port .*/Port 2222/' /etc/ssh/sshd_config
-sudo sed -i 's/^#\?ListenAddress .*/ListenAddress 0.0.0.0/' /etc/ssh/sshd_config
-sudo sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
-sudo sed -i 's/^#\?PubkeyAuthentication .*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-sudo sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
-
-# 设置 .ssh 目录与公钥
-mkdir -p ~/.ssh
-echo "$PUBLIC_KEY" > ~/.ssh/authorized_keys
-chmod 700 ~/.ssh
-chmod 600 ~/.ssh/authorized_keys
-
-# 启动 ssh 服务
-sudo service ssh restart
-
-echo "✅ SSH 服务配置完成，请确认 Windows 已设置端口转发。"
-```
+MIT
