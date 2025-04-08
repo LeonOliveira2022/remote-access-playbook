@@ -26,7 +26,9 @@ Set-Service -Name sshd -StartupType Automatic
 
 # 3. Allow port through firewall
 Write-Host "[*] Adding firewall rule for port $port..."
-New-NetFirewallRule -Name "sshd-$port" -DisplayName "OpenSSH Server on $port" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort $port
+if (-not (Get-NetFirewallRule -Name "sshd-$port" -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule -Name "sshd-$port" -DisplayName "OpenSSH Server on $port" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort $port
+}
 
 # 4. Modify sshd_config for custom port and pubkey auth
 Write-Host "[*] Configuring sshd_config..."
@@ -52,7 +54,7 @@ if (!(Test-Path $auth_file)) {
 
 # Set permissions
 icacls $ssh_path /inheritance:r | Out-Null
-icacls $ssh_path /grant "$username:(OI)(CI)F" | Out-Null
+icacls $ssh_path /grant "${env:USERNAME}:(OI)(CI)F" | Out-Null
 icacls $auth_file /inheritance:r | Out-Null
 icacls $auth_file /grant "$username:R" | Out-Null
 
