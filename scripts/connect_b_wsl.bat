@@ -7,4 +7,4 @@ if not exist "%SSH_CONFIG%" (
 )
 
 echo 正在连接 B 电脑 WSL...
-ssh b-ws
+ssh b-wsl
