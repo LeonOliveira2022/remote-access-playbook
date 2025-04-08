@@ -12,7 +12,7 @@ remote-access-playbook/
 ├── scripts/
 │   ├── connect_b_wsl.bat          # Connect to B's WSL from A
 │   ├── init_wsl_ssh.sh            # One-click setup script for B's WSL
-│   └── (planned) init_win_ssh.ps1 # Windows SSH setup (coming soon)
+│   └── init_win_ssh.ps1           # One-click setup for B's Windows (Run as Administrator)
 └── docs/
     └── wsl_ssh_setup.md           # Detailed setup guide for WSL remote access
 ```
@@ -21,9 +21,10 @@ remote-access-playbook/
 
 ## ✅ Features
 
-- 🔐 SSH key-based login from A → B (WSL)
+- 🔐 SSH key-based login from A → B (WSL & Windows)
 - 🔀 Windows-to-WSL port forwarding setup
 - 💻 VSCode Remote - SSH integration
+- 🧰 One-click setup scripts for both Windows and WSL
 - 📦 Extensible for other protocols (WinRM, RDP, SMB...)
 
 ---
@@ -42,11 +43,10 @@ bash scripts/init_wsl_ssh.sh
 
 ### 2. On B's Windows:
 
-Set up port forwarding:
+Run the PowerShell setup (as administrator):
 
-```cmd
-netsh interface portproxy add v4tov4 listenport=2222 listenaddress=0.0.0.0 connectport=2222 connectaddress=<WSL-IP>
-netsh advfirewall firewall add rule name="WSL SSH" dir=in action=allow protocol=TCP localport=2222
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/init_win_ssh.ps1
 ```
 
 ### 3. On A:
@@ -80,7 +80,7 @@ See [`docs/wsl_ssh_setup.md`](docs/wsl_ssh_setup.md) for detailed step-by-step i
 ## 🛣️ Roadmap
 
 - ✅ A → B (WSL via SSH)
-- 🔜 A → B (Windows native via OpenSSH / WinRM)
+- ✅ A → B (Windows native via OpenSSH)
 - 🔜 Remote desktop (RDP)
 - 🔜 File sharing (SMB/Samba)
 - 🔜 Multi-hop tunneling & private network (Zerotier/Tailscale)
