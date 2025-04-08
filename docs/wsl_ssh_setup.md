@@ -1,92 +1,236 @@
-# 🧰 Remote Access Playbook
+# WSL SSH Setup Guide (A → B's WSL)
 
-A practical playbook for setting up secure remote access from one PC (A) to another (B), covering both **WSL** and **Windows** environments.
+## 📄 Overview
+
+This guide helps you configure **secure SSH key-based access** from computer **A** to **B's WSL (Ubuntu)** environment via custom port forwarding and firewall configuration.
 
 ---
 
-## 📂 Structure
+## 🔎 Environment
 
+| Role | Host OS  | Username |
+|------|----------|----------|
+| A    | Windows  | `Leon`   |
+| B    | Windows + WSL2 | Windows: `Steven` / WSL: `steven` |
+
+Port: `2222` (custom for WSL)
+
+---
+
+## ✅ Step 1: Generate SSH Key on A
+
+Run this in **A's CMD** or **PowerShell**:
+
+```sh
+ssh-keygen -t ed25519 -f %USERPROFILE%\.ssh\b_wsl_ed25519
 ```
-remote-access-playbook/
-├── README.md
-├── scripts/
-│   ├── connect_b_wsl.bat          # Connect to B's WSL from A
-│   ├── init_wsl_ssh.sh            # One-click setup script for B's WSL
-│   └── init_win_ssh.ps1           # One-click setup for B's Windows (Run as Administrator)
-└── docs/
-    └── wsl_ssh_setup.md           # Detailed setup guide for WSL remote access
-```
+
+This will generate:
+- Private key: `%USERPROFILE%\.ssh\b_wsl_ed25519`
+- Public key: `%USERPROFILE%\.ssh\b_wsl_ed25519.pub`
 
 ---
 
-## ✅ Features
+## 🌐 Step 2: Configure SSH in B's WSL
 
-- 🔐 SSH key-based login from A → B (WSL & Windows)
-- 🔀 Windows-to-WSL port forwarding setup
-- 💻 VSCode Remote - SSH integration
-- 🧰 One-click setup scripts for both Windows and WSL
-- 📦 Extensible for other protocols (WinRM, RDP, SMB...)
+### 2.1 Run the auto setup script
 
----
+Copy your public key into `scripts/init_wsl_ssh.sh` under the variable `PUBLIC_KEY=...`
 
-## 🚀 Quick Start
-
-### 1. On B's WSL:
-
-Run the setup script:
+Then run inside WSL:
 
 ```bash
 bash scripts/init_wsl_ssh.sh
 ```
 
-(Replace `PUBLIC_KEY=` inside the script with your actual SSH public key.)
+Or do it manually:
 
-### 2. On B's Windows:
+```bash
+sudo apt update && sudo apt install -y openssh-server
 
-Run the PowerShell setup (as administrator):
+sudo sed -i 's/^#\?Port .*/Port 2222/' /etc/ssh/sshd_config
+sudo sed -i 's/^#\?ListenAddress .*/ListenAddress 0.0.0.0/' /etc/ssh/sshd_config
+sudo sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sudo sed -i 's/^#\?PubkeyAuthentication .*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+sudo sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/init_win_ssh.ps1
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+cat <<EOF > ~/.ssh/authorized_keys
+<PASTE YOUR PUBLIC KEY HERE>
+EOF
+chmod 600 ~/.ssh/authorized_keys
+
+sudo service ssh restart
 ```
 
-### 3. On A:
+---
 
-Connect via:
+## 🚧 Step 3: Forward Port in B's Windows
 
+### 3.1 Get WSL IP
+
+In WSL:
+```bash
+ip -4 addr show eth0 | grep inet
+```
+
+### 3.2 Forward Windows:2222 → WSL:2222
+
+Run in **B's Windows CMD** as admin:
+
+```cmd
+netsh interface portproxy add v4tov4 listenport=2222 listenaddress=0.0.0.0 connectport=2222 connectaddress=<WSL-IP>
+```
+
+### 3.3 Open Firewall Port
+
+```cmd
+netsh advfirewall firewall add rule name="WSL SSH" dir=in action=allow protocol=TCP localport=2222
+```
+
+---
+
+## 🔍 Step 4: A connects to B's WSL
+
+### Option 1: Direct
 ```bash
 ssh -i ~/.ssh/b_wsl_ed25519 steven@<B_IP> -p 2222
 ```
 
-Or, after editing your `~/.ssh/config`:
+### Option 2: Use SSH Config
 
+Create `~/.ssh/config`:
+
+```ssh
+Host b-wsl
+    HostName <B_IP>
+    Port 2222
+    User steven
+    IdentityFile ~/.ssh/b_wsl_ed25519
+    IdentitiesOnly yes
+```
+
+Then connect:
 ```bash
 ssh b-wsl
 ```
 
-### 4. (Optional) Use VSCode to edit files remotely:
+---
 
+## 📂 Step 5: VSCode Remote SSH into WSL
+
+Install **Remote - SSH** extension in VSCode.
+
+Launch via:
 ```bash
 code --folder-uri "vscode-remote://ssh-remote+b-wsl/home/steven"
 ```
 
----
-
-## 📖 Full Guide
-
-See [`docs/wsl_ssh_setup.md`](docs/wsl_ssh_setup.md) for detailed step-by-step instructions.
+Or via Command Palette: `Remote-SSH: Connect to Host...` and select `b-wsl`.
 
 ---
 
-## 🛣️ Roadmap
+# Windows SSH Setup Guide (A → B's Windows)
 
-- ✅ A → B (WSL via SSH)
-- ✅ A → B (Windows native via OpenSSH)
-- 🔜 Remote desktop (RDP)
-- 🔜 File sharing (SMB/Samba)
-- 🔜 Multi-hop tunneling & private network (Zerotier/Tailscale)
+## 📄 Overview
+
+This guide enables **SSH access directly into Windows (B)** from computer **A**, ideal for native remote management and VSCode integration.
 
 ---
 
-## 📄 License
+## 🔎 Environment
 
-MIT
+| Role | OS       | Username |
+|------|----------|----------|
+| A    | Windows  | `Leon`   |
+| B    | Windows  | `Steven` |
+
+Port: `22222` (custom)
+
+---
+
+## ✅ Step 1: Generate SSH Key on A
+
+```cmd
+ssh-keygen -t ed25519 -f %USERPROFILE%\.ssh\b_win_ed25519
+```
+
+---
+
+## ⚖️ Step 2: Run Setup Script on B
+
+Run the PowerShell script as **administrator**:
+
+```powershell
+scripts/init_win_ssh.ps1
+```
+
+This will:
+- Install OpenSSH.Server
+- Enable and start the `sshd` service
+- Configure port `22222`
+- Add firewall rule
+- Create `.ssh/authorized_keys`
+
+> You still need to **paste your public key** into `authorized_keys` manually or via script.
+
+---
+
+## 🔧 Step 3: Paste Public Key to B
+
+On A:
+```cmd
+type %USERPROFILE%\.ssh\b_win_ed25519.pub
+```
+
+On B:
+```powershell
+notepad $env:USERPROFILE\.ssh\authorized_keys
+```
+
+Paste and save. Then restart sshd:
+```powershell
+Restart-Service sshd
+```
+
+---
+
+## 🔍 Step 4: A connects to B
+
+### Option 1: Direct
+```bash
+ssh -i ~/.ssh/b_win_ed25519 steven@<B_IP> -p 22222
+```
+
+### Option 2: Use SSH Config
+
+```ssh
+Host b-win
+    HostName <B_IP>
+    Port 22222
+    User steven
+    IdentityFile ~/.ssh/b_win_ed25519
+    IdentitiesOnly yes
+```
+
+Then connect:
+```bash
+ssh b-win
+```
+
+---
+
+## 📂 Step 5: VSCode Remote SSH into Windows
+
+```bash
+code --folder-uri "vscode-remote://ssh-remote+b-win/C:/Users/Steven"
+```
+
+Or use Command Palette and select `b-win`.
+
+---
+
+## 🎉 Done!
+
+You're now ready to manage B's WSL and Windows environments securely over SSH from A, with full VSCode integration.
