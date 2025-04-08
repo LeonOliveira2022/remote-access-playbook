@@ -148,9 +148,6 @@ code --folder-uri "vscode-remote://ssh-remote+b-wsl/home/steven"
 即可远程打开 WSL 中 `/home/steven` 文件夹。
 
 ---
-```
-
----
 
 ## 📦 `.bat` 脚本：A 电脑一键连接（`connect_b_wsl.bat`）
 
